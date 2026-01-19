@@ -17,7 +17,7 @@ struct dpu_info_t {
 };
 struct dpu_info_t *dpu_info;
 
-#define NUM_LAYERS 3 
+#define NUM_LAYERS 3
 #define max(x, y) (x > y ? x : y)
 #define min(x, y) (x < y ? x : y)
 
@@ -32,7 +32,7 @@ struct dpu_info_t *dpu_info;
 #endif
 
 // Data type
-#define T int32_t
+#define T uint32_t
 
 #ifndef ENERGY
 #define ENERGY 0

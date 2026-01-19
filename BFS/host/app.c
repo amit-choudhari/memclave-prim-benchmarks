@@ -19,6 +19,7 @@
 #include "../support/params.h"
 #include "../support/timer.h"
 #include "../support/utils.h"
+#include "../support/prim_results.h"
 
 #ifndef ENERGY
 #define ENERGY 0
@@ -37,7 +38,7 @@ int main(int argc, char** argv) {
 
     // Timer and profiling
     Timer timer;
-    float loadTime = 0.0f, dpuTime = 0.0f, hostTime = 0.0f, retrieveTime = 0.0f;
+    float loadTime = 0.0f, dpuTime = 0.0f, hostTime = 0.0f, retrieveTime = 0.0f, CPUTime = 0.0f;
     #if ENERGY
     struct dpu_probe_t probe;
     DPU_ASSERT(dpu_probe_init("energy_probe", &probe));
@@ -243,11 +244,11 @@ int main(int argc, char** argv) {
     stopTimer(&timer);
     retrieveTime += getElapsedTime(timer);
     PRINT_INFO(p.verbosity >= 1, "    DPU-CPU Time: %f ms", retrieveTime*1e3);
-    if(p.verbosity == 0) PRINT("CPU-DPU Time(ms): %f    DPU Kernel Time (ms): %f    Inter-DPU Time (ms): %f    DPU-CPU Time (ms): %f", loadTime*1e3, dpuTime*1e3, hostTime*1e3, retrieveTime*1e3);
 
     // Calculating result on CPU
     PRINT_INFO(p.verbosity >= 1, "Calculating result on CPU");
     uint32_t* nodeLevelReference = calloc(numNodes, sizeof(uint32_t)); // Node's BFS level (initially all 0 meaning not reachable)
+    startTimer(&timer);
     memset(nextFrontier, 0, numNodes/64*sizeof(uint64_t));
     setBit(nextFrontier[0], 0); // Initialize frontier to first node
     nextFrontierEmpty = 0;
@@ -291,13 +292,24 @@ int main(int argc, char** argv) {
         }
         ++level;
     }
+    stopTimer(&timer);
+    CPUTime = getElapsedTime(timer);
+    PRINT_INFO(p.verbosity >= 1, "CPU Version Time: %f ms", CPUTime*1e3);
+    if(p.verbosity == 0) PRINT("CPU Version Time (ms): %f    CPU-DPU Time(ms): %f    DPU Kernel Time (ms): %f    Inter-DPU Time (ms): %f    DPU-CPU Time (ms): %f", CPUTime*1e3, loadTime*1e3, dpuTime*1e3, hostTime*1e3, retrieveTime*1e3);
 
     // Verify the result
+    bool status = 1;
     PRINT_INFO(p.verbosity >= 1, "Verifying the result");
     for(uint32_t nodeIdx = 0; nodeIdx < numNodes; ++nodeIdx) {
         if(nodeLevel[nodeIdx] != nodeLevelReference[nodeIdx]) {
             PRINT_ERROR("Mismatch at node %u (CPU result = level %u, DPU result = level %u)", nodeIdx, nodeLevelReference[nodeIdx], nodeLevel[nodeIdx]);
+	    status =0;
         }
+    }
+    if (status) {
+        printf("[OK] Outputs are equal\n");
+    } else {
+        printf("[ERROR] Outputs differ!\n");
     }
 
     // Display DPU Logs
@@ -310,6 +322,13 @@ int main(int argc, char** argv) {
             ++dpuIdx;
         }
     }
+        // update CSV
+#define TEST_NAME "BFS"
+#define RESULTS_FILE "../prim_results.csv"
+        update_csv(RESULTS_FILE, TEST_NAME, "CPU", CPUTime*1e3);
+        update_csv(RESULTS_FILE, TEST_NAME, "U_C2D", loadTime*1e3);
+        update_csv(RESULTS_FILE, TEST_NAME, "U_D2C", retrieveTime*1e3);
+        update_csv(RESULTS_FILE, TEST_NAME, "UPMEM", dpuTime*1e3);
 
     // Deallocate data structures
     freeCOOGraph(cooGraph);

@@ -20,6 +20,7 @@
 
 #include "params.h"
 #include "timer.h"
+#include "prim_results.h"
 
 // Define the DPU Binary path as DPU_BINARY here
 #define DPU_BINARY "./bin/bs_dpu"
@@ -75,6 +76,7 @@ int main(int argc, char **argv) {
 	uint64_t num_querys = p.num_querys;
 	DTYPE result_host = -1;
 	DTYPE result_dpu  = -1;
+	printf("BL:%d,%d , t_per_dpu:%d", BLOCK_SIZE, BLOCK_SIZE_LOG2, NB_OF_TASKLETS_PER_DPU);
 
 	// Create the timer
 	Timer timer;
@@ -92,6 +94,7 @@ int main(int argc, char **argv) {
 	// Query number adjustement for proper partitioning
 	if(num_querys % (nr_of_dpus * NR_TASKLETS))
 	num_querys = num_querys + (nr_of_dpus * NR_TASKLETS - num_querys % (nr_of_dpus * NR_TASKLETS));
+	printf("num_querys:%d\n", num_querys);
 
 	assert(num_querys % (nr_of_dpus * NR_TASKLETS) == 0 && "Input dimension");    // Allocate input and querys vectors
 
@@ -211,6 +214,14 @@ int main(int argc, char **argv) {
 	print(&timer, 2, p.n_reps);
 	printf("DPU-CPU Time (ms): ");
 	print(&timer, 3, p.n_reps);
+
+    // update CSV
+#define TEST_NAME "BS"
+#define RESULTS_FILE "../prim_results.csv"
+    update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 0, p.n_reps, "CPU");
+    update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 1, p.n_reps, "U_C2D");
+    update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 3, p.n_reps, "U_D2C");
+    update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 2, p.n_reps, "UPMEM");
 
 	#if ENERGY
 	double energy;

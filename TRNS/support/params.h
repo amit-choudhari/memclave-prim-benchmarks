@@ -37,8 +37,8 @@ struct Params input_params(int argc, char **argv) {
     p.m             = 16;
     p.N_            = 1;
     p.n             = 8;
-    p.n_warmup      = 1;
-    p.n_reps        = 3;
+    p.n_warmup      = 0;
+    p.n_reps        = 1;
     p.exp           = 0;
 
     int opt;

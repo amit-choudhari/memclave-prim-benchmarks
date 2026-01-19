@@ -1,10 +1,10 @@
 DPU_DIR := dpu
 HOST_DIR := host
 BUILDDIR ?= bin
-NR_TASKLETS ?= 13
-BL ?= 1024 
+NR_TASKLETS ?= 16
+BL ?= 16 
 BL_IN ?= 4 
-NR_DPUS ?= 1 
+NR_DPUS ?= 64
 ENERGY ?= 0
 
 define conf_filename

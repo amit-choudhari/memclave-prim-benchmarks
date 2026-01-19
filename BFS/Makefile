@@ -4,7 +4,7 @@ CPU_BASE_DIR := baselines/cpu
 GPU_BASE_DIR := baselines/gpu
 BUILDDIR ?= bin
 NR_TASKLETS ?= 16
-NR_DPUS ?= 1
+NR_DPUS ?= 64
 
 define conf_filename
 	${BUILDDIR}/.NR_DPUS_$(1)_NR_TASKLETS_$(2).conf

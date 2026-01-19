@@ -16,6 +16,7 @@
 #include "../support/common.h"
 #include "../support/timer.h"
 #include "../support/params.h"
+#include "../support/prim_results.h"
 
 #if ENERGY
 #include <dpu_probe.h>
@@ -195,7 +196,7 @@ int main(int argc, char **argv) {
     DPU_ASSERT(dpu_alloc(NR_DPUS, NULL, &dpu_set));
     DPU_ASSERT(dpu_load(dpu_set, DPU_BINARY, NULL));
     DPU_ASSERT(dpu_get_nr_dpus(dpu_set, &nr_of_dpus));
-    printf("Allocated %d DPU(s)\n", nr_of_dpus);
+    printf("Allocated %d DPU(s), BL:%d\n", nr_of_dpus, BL);
     printf("Allocated %d TASKLET(s) per DPU\n", NR_TASKLETS);
 #if DYNAMIC
     max_dpus = nr_of_dpus;
@@ -844,6 +845,14 @@ int main(int argc, char **argv) {
     printf("Longest Diagonal DPU-CPU ");
     print(&long_diagonal_timer, 4, p.n_reps);
     printf("\n");
+
+    // update CSV    
+#define TEST_NAME "NW"
+#define RESULTS_FILE "../prim_results.csv"
+    update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 0, p.n_reps, "CPU");
+    update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 2, p.n_reps, "U_C2D");
+    update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 4, p.n_reps, "U_D2C");
+    update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 3, p.n_reps, "UPMEM");
     
 #if ENERGY
     printf("DPU Energy (J): %f \t ", tavg_energy / p.n_reps);

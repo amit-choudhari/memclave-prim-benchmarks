@@ -16,6 +16,7 @@
 #include "../support/common.h"
 #include "../support/timer.h"
 #include "../support/params.h"
+#include "../support/prim_results.h"
 
 // Define the DPU Binary path as DPU_BINARY here
 #ifndef DPU_BINARY
@@ -25,6 +26,9 @@
 #if ENERGY
 #include <dpu_probe.h>
 #endif
+
+#define LOG_WORDS 8
+#define LOG_MAGIC 0x534B4C4F475631ULL
 
 // Pointer declaration
 static T* A;
@@ -66,7 +70,7 @@ int main(int argc, char **argv) {
     DPU_ASSERT(dpu_alloc(NR_DPUS, NULL, &dpu_set));
     DPU_ASSERT(dpu_load(dpu_set, DPU_BINARY, NULL));
     DPU_ASSERT(dpu_get_nr_dpus(dpu_set, &nr_of_dpus));
-    printf("Allocated %d DPU(s)\n", nr_of_dpus);
+    printf("Allocated %d DPU(s) %d\n", nr_of_dpus, p.input_size);
     unsigned int i = 0;
 
     const unsigned int input_size = p.exp == 0 ? p.input_size * nr_of_dpus : p.input_size; // Total input size (weak or strong scaling)
@@ -152,6 +156,33 @@ int main(int argc, char **argv) {
             DPU_ASSERT(dpu_probe_stop(&probe));
             #endif
         }
+			{
+			/* gather 64B log from each DPU by symbol name */
+			uint64_t logs[NR_DPUS][LOG_WORDS];
+
+			struct dpu_set_t dpu;
+			uint32_t idx = 0;
+			DPU_FOREACH(dpu_set, dpu) {
+			    dpu_prepare_xfer(dpu, &logs[idx][0]);
+			    idx++;
+			}
+			DPU_ASSERT(dpu_push_xfer(dpu_set, DPU_XFER_FROM_DPU, "sk_log",
+			                         0, LOG_WORDS * sizeof(uint64_t),
+			                         DPU_XFER_DEFAULT));
+
+			/* reduce max cycles over DPUs (only those that wrote a valid record) */
+			uint64_t max_cycles = 0;
+			for (uint32_t i = 0; i < idx; i++) {
+ 			   if (logs[i][0] == LOG_MAGIC) {
+			        if (logs[i][1] > max_cycles) max_cycles = logs[i][1];
+			    }
+			}
+
+			/* print an easy-to-compare line */
+			printf("DPU cycles (whole-kernel, max over DPUs): %llu\n",
+			       (unsigned long long)max_cycles);
+
+			}
 
 #if PRINT
         {
@@ -188,6 +219,13 @@ int main(int argc, char **argv) {
     print(&timer, 2, p.n_reps);
     printf("DPU-CPU ");
     print(&timer, 3, p.n_reps);
+    // update CSV
+#define TEST_NAME "VA"
+#define RESULTS_FILE "../prim_results.csv"
+    update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 0, p.n_reps, "CPU");
+    update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 1, p.n_reps, "U_C2D");
+    update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 3, p.n_reps, "U_D2C");
+    update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 2, p.n_reps, "UPMEM");
 
 #if ENERGY
     double energy;

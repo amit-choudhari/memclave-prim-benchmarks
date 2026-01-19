@@ -2,8 +2,8 @@ DPU_DIR := dpu
 HOST_DIR := host
 BUILDDIR ?= bin
 NR_TASKLETS ?= 16
-NR_DPUS ?= 1
-PROBLEM_SIZE ?= 2
+NR_DPUS ?= 64
+PROBLEM_SIZE ?= 1048576
 
 define conf_filename
 	${BUILDDIR}/.NR_DPUS_$(1)_NR_TASKLETS_$(2).conf

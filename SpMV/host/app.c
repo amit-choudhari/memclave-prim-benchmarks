@@ -19,6 +19,7 @@
 #include "../support/params.h"
 #include "../support/timer.h"
 #include "../support/utils.h"
+#include "../support/prim_results.h"
 
 #define DPU_BINARY "./bin/dpu_code"
 
@@ -174,6 +175,7 @@ int main(int argc, char** argv) {
 
     // Calculating result on CPU
     PRINT_INFO(p.verbosity >= 1, "Calculating result on CPU");
+    startTimer(&timer);
     float* outVectorReference = malloc(numRows*sizeof(float));
     for(uint32_t rowIdx = 0; rowIdx < numRows; ++rowIdx) {
         float sum = 0.0f;
@@ -184,15 +186,37 @@ int main(int argc, char** argv) {
         }
         outVectorReference[rowIdx] = sum;
     }
+    stopTimer(&timer);
+    float cpuTime = getElapsedTime(timer);
+    if (p.verbosity >= 0) {
+        PRINT("CPU Time(ms): %f, CPU-DPU Time(ms): %f    DPU Kernel Time (ms): %f    DPU-CPU Time (ms): %f",
+              cpuTime * 1e3, loadTime * 1e3, dpuTime * 1e3, retrieveTime * 1e3);
+    }
+
+        // update CSV           
+#define TEST_NAME "SpMV"
+#define RESULTS_FILE "../prim_results.csv"
+        update_csv(RESULTS_FILE, TEST_NAME, "CPU", cpuTime*1e3);
+        update_csv(RESULTS_FILE, TEST_NAME, "U_C2D", loadTime*1e3);
+        update_csv(RESULTS_FILE, TEST_NAME, "U_D2C", retrieveTime*1e3);
+        update_csv(RESULTS_FILE, TEST_NAME, "UPMEM", dpuTime*1e3);
 
     // Verify the result
     PRINT_INFO(p.verbosity >= 1, "Verifying the result");
+    bool status = true;
     for(uint32_t rowIdx = 0; rowIdx < numRows; ++rowIdx) {
         float diff = (outVectorReference[rowIdx] - outVector[rowIdx])/outVectorReference[rowIdx];
         const float tolerance = 0.00001;
         if(diff > tolerance || diff < -tolerance) {
+	    status = false;
             PRINT_ERROR("Mismatch at index %u (CPU result = %f, DPU result = %f)", rowIdx, outVectorReference[rowIdx], outVector[rowIdx]);
         }
+    }
+
+    if (status) {
+        printf("[OK] Outputs are equal\n");
+    } else {
+        printf("[ERROR] Outputs differ!\n");
     }
 
     // Display DPU Logs

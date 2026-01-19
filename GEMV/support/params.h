@@ -29,8 +29,8 @@ struct Params input_params(int argc, char **argv) {
     struct Params p;
     p.m_size        = 8192;
     p.n_size        = 8192;
-    p.n_warmup      = 1;
-    p.n_reps        = 3;
+    p.n_warmup      = 0;
+    p.n_reps        = 1;
 
     int opt;
     while((opt = getopt(argc, argv, "hm:n:w:e:")) >= 0) {

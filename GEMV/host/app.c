@@ -21,6 +21,7 @@
 #include "../support/common.h"
 #include "../support/timer.h"
 #include "../support/params.h"
+#include "../support/prim_results.h"
 
 // Define the DPU Binary path as DPU_BINARY here
 #ifndef DPU_BINARY
@@ -228,6 +229,14 @@ int main(int argc, char **argv) {
 	print(&timer, 2, p.n_reps);
 	printf("DPU-CPU Time (ms): ");
 	print(&timer, 3, p.n_reps);
+
+        // update CSV
+#define TEST_NAME "GEMV"
+#define RESULTS_FILE "../prim_results.csv"
+        update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 0, p.n_reps, "CPU");
+        update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 1, p.n_reps, "U_C2D");
+        update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 3, p.n_reps, "U_D2C");
+        update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 2, p.n_reps, "UPMEM");
 
 #if ENERGY
 	printf("Energy (J): %f J\t", avg_energy);

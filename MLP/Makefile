@@ -2,8 +2,8 @@ DPU_DIR := dpu
 HOST_DIR := host
 BUILDDIR ?= bin
 NR_TASKLETS ?= 16 
-BL ?= 10
-NR_DPUS ?= 1 
+BL ?= 8
+NR_DPUS ?= 64
 
 define conf_filename
 	${BUILDDIR}/.NR_DPUS_$(1)_NR_TASKLETS_$(2)_BL_$(3).conf

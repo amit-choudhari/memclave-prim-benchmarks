@@ -34,8 +34,8 @@ struct Params input_params(int argc, char **argv) {
     struct Params p;
     p.input_size    = 1536 * 1024;
     p.bins          = 256;
-    p.n_warmup      = 1;
-    p.n_reps        = 3;
+    p.n_warmup      = 0;
+    p.n_reps        = 1;
     p.exp           = 0;
     p.file_name     = "./input/image_VanHateren.iml";
     p.dpu_s         = 64;

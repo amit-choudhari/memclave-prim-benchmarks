@@ -16,6 +16,7 @@
 #include "../support/common.h"
 #include "../support/timer.h"
 #include "../support/params.h"
+#include "../support/prim_results.h"
 
 // Define the DPU Binary path as DPU_BINARY here
 #ifndef DPU_BINARY
@@ -240,6 +241,7 @@ int main(int argc, char **argv) {
             DPU_ASSERT(dpu_prepare_xfer(dpu, bufferC + input_size_dpu * i));
         }
         DPU_ASSERT(dpu_push_xfer(dpu_set, DPU_XFER_FROM_DPU, DPU_MRAM_HEAP_POINTER_NAME, input_size_dpu * sizeof(T), input_size_dpu * sizeof(T), DPU_XFER_DEFAULT));
+	printf("%d\n",input_size_dpu * sizeof(T)/8);
         if(rep >= p.n_warmup)
             stop(&timer, 5);
 
@@ -260,6 +262,15 @@ int main(int argc, char **argv) {
     print(&timer, 4, p.n_reps);
     printf("DPU-CPU ");
     print(&timer, 5, p.n_reps);
+
+#define TEST_NAME "SCAN-SSA"
+#define RESULTS_FILE "../prim_results.csv"
+    update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 0, p.n_reps, "CPU");
+    update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 1, p.n_reps, "U_C2D");
+    update_csv_from_timer(RESULTS_FILE, TEST_NAME, &timer, 5, p.n_reps, "U_D2C");
+    double dpu_ms = prim_timer_ms_avg(&timer, 2, p.n_reps) + prim_timer_ms_avg(&timer, 4, p.n_reps);
+    update_csv(RESULTS_FILE, TEST_NAME, "UPMEM", dpu_ms);
+
 
     #if ENERGY
     double energy;
