@@ -11,8 +11,12 @@ import urllib.error
 import urllib.request
 from datetime import datetime
 from pathlib import Path
+from typing import List, Tuple
 
 
+# ---------------------------
+# Bench config
+# ---------------------------
 DEFAULT_BENCH_DIRS = [
     "BFS", "BS", "GEMV", "HST-L", "HST-S", "MLP", "NW", "RED",
     "SCAN-RSS", "SCAN-SSA", "SEL", "SpMV", "TRNS", "TS", "UNI", "VA",
@@ -22,15 +26,16 @@ EXCLUDE_BIN_NAMES = {
     "dpu_code", "dpu", "dpu_host", "gemv_dpu", "trns_dpu", "bfs_dpu", "nw_dpu"
 }
 
+
 # ---------------------------
 # Zenodo dataset config (BFS)
 # ---------------------------
-# Try multiple URL forms; Zenodo/CDN can be flaky.
+# Try multiple URL forms; Zenodo/CDN can be flaky on large files.
 ZENODO_BFS_URLS = [
     "https://zenodo.org/records/18307126/files/bfs-data.tar.zst?download=1",
     "https://zenodo.org/records/18307126/files/bfs-data.tar.zst",
 ]
-# From bfs-data.tar.zst.sha256 you uploaded alongside the archive
+# From bfs-data.tar.zst.sha256 (your uploaded checksum file)
 ZENODO_BFS_SHA256 = "1fe6b7b185509cd567fd530f378aa15c48ff43ad5be8d2c9707e93ff0ada7f3a"
 
 BFS_MARKERS = [
@@ -40,6 +45,9 @@ BFS_MARKERS = [
 ]
 
 
+# ---------------------------
+# Helpers
+# ---------------------------
 def is_executable(p: Path) -> bool:
     return p.is_file() and os.access(str(p), os.X_OK)
 
@@ -90,6 +98,29 @@ def classify(output: str, rc: int) -> tuple[bool, str]:
     return False, "no OK/ERROR marker"
 
 
+# ---------------------------
+# Make
+# ---------------------------
+def run_make(bench_dir: Path, jobs: int | None, target: str | None) -> tuple[int, str]:
+    cmd: List[str] = ["make"]
+    if jobs and jobs > 0:
+        cmd += [f"-j{jobs}"]
+    if target:
+        cmd += [target]
+
+    proc = subprocess.run(
+        cmd,
+        cwd=str(bench_dir),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    return proc.returncode, (proc.stdout or "")
+
+
+# ---------------------------
+# Download + extract (BFS)
+# ---------------------------
 def sha256_file(p: Path) -> str:
     h = hashlib.sha256()
     with p.open("rb") as f:
@@ -209,7 +240,7 @@ def extract_tar_zst(archive: Path, out_dir: Path) -> None:
         if proc.returncode == 0:
             return
     except FileNotFoundError:
-        proc = None
+        pass
 
     # Fallback: zstd -dc | tar -xf -
     zstd = subprocess.Popen(["zstd", "-dc", str(archive)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -252,7 +283,6 @@ def ensure_bfs_data(bench_dir: Path, allow_download: bool = True) -> tuple[bool,
     print("      verifying sha256...")
     got = sha256_file(archive)
     if got.lower() != ZENODO_BFS_SHA256.lower():
-        # delete corrupt archive to avoid getting stuck
         try:
             archive.unlink()
         except OSError:
@@ -268,30 +298,71 @@ def ensure_bfs_data(bench_dir: Path, allow_download: bool = True) -> tuple[bool,
     return False, f"extracted but markers still missing: {', '.join(missing)}"
 
 
+# ---------------------------
+# Args
+# ---------------------------
+def parse_args(argv: List[str]) -> tuple[List[str], bool, int | None, str | None, bool]:
+    """
+    Returns: (selected_benchmarks, do_make, jobs, make_target, allow_download)
+    """
+    do_make = True
+    allow_download = True
+    jobs: int | None = None
+    make_target: str | None = None
+
+    selected: List[str] = []
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--list":
+            print("Benchmarks:")
+            for b in DEFAULT_BENCH_DIRS:
+                print(f"  {b}")
+            sys.exit(0)
+        elif a == "--no-make":
+            do_make = False
+        elif a == "--no-download":
+            allow_download = False
+        elif a in ("-j", "--jobs"):
+            if i + 1 >= len(argv):
+                raise SystemExit("Missing value for --jobs")
+            jobs = int(argv[i + 1])
+            i += 1
+        elif a == "--make-target":
+            if i + 1 >= len(argv):
+                raise SystemExit("Missing value for --make-target")
+            make_target = argv[i + 1]
+            i += 1
+        else:
+            selected.append(a)
+        i += 1
+
+    if not selected:
+        selected = DEFAULT_BENCH_DIRS
+
+    return selected, do_make, jobs, make_target, allow_download
+
+
+# ---------------------------
+# Main
+# ---------------------------
 def main():
     root = Path.cwd()
-
-    args = sys.argv[1:]
-    allow_download = True
-    if "--no-download" in args:
-        allow_download = False
-        args = [a for a in args if a != "--no-download"]
-
-    if args and args[0] == "--list":
-        print("Benchmarks:")
-        for b in DEFAULT_BENCH_DIRS:
-            print(f"  {b}")
-        sys.exit(0)
-
-    selected = args if args else DEFAULT_BENCH_DIRS
+    selected, do_make, jobs, make_target, allow_download = parse_args(sys.argv[1:])
 
     logdir = root / "logs" / datetime.now().strftime("%Y%m%d_%H%M%S")
     logdir.mkdir(parents=True, exist_ok=True)
 
-    passed, failed = [], []
+    passed: List[str] = []
+    failed: List[Tuple[str, str]] = []
 
     print(f"Root         : {root}")
     print(f"Logs         : {logdir}")
+    if do_make:
+        make_desc = f"enabled (jobs={jobs if jobs is not None else 'default'}, target={make_target or 'default'})"
+    else:
+        make_desc = "disabled"
+    print(f"Make         : {make_desc}")
     print(f"Auto-download: {'yes' if allow_download else 'no'}")
     print()
 
@@ -303,7 +374,7 @@ def main():
             print()
             continue
 
-        # Ensure BFS datasets
+        # Ensure BFS datasets (before build/run so we don't waste time)
         if bench == "BFS":
             ok, reason = ensure_bfs_data(bench_dir, allow_download=allow_download)
             if not ok:
@@ -314,6 +385,32 @@ def main():
             print(f"[OK]   {bench}: {reason}")
             print()
 
+        # 1) Build
+        if do_make:
+            mf = bench_dir / "Makefile"
+            if not mf.exists():
+                failed.append((bench, "missing Makefile"))
+                print(f"[FAIL] {bench}: Makefile not found")
+                print()
+                continue
+
+            print(f"==> Building {bench}: make {'-j'+str(jobs) if jobs else ''} {make_target or ''}".strip())
+            rc, out = run_make(bench_dir, jobs=jobs, target=make_target)
+            make_log = logdir / f"{bench}.make.log"
+            make_log.write_text(out, encoding="utf-8", errors="replace")
+
+            if rc != 0:
+                failed.append((bench, f"make failed (rc={rc})"))
+                print(f"[FAIL] {bench}: make failed (rc={rc})")
+                print(f"      make log: {make_log}")
+                print()
+                continue
+            else:
+                print(f"[OK]   {bench}: make succeeded")
+                print(f"      make log: {make_log}")
+                print()
+
+        # 2) Find host binary
         host_bin = pick_host_binary(bench_dir)
         if host_bin is None:
             failed.append((bench, "no host binary found"))
@@ -321,10 +418,11 @@ def main():
             print()
             continue
 
-        log_path = logdir / f"{bench}.log"
+        # 3) Run host binary
+        log_path = logdir / f"{bench}.run.log"
         cmd = [str(host_bin)]
-
         print(f"==> Running {bench}: (cwd={bench_dir.name}) ./{host_bin.relative_to(bench_dir)}")
+
         try:
             proc = subprocess.run(
                 cmd,
@@ -350,7 +448,7 @@ def main():
             failed.append((bench, reason))
             print(f"[FAIL] {bench}: {reason}")
 
-        print(f"      log: {log_path}")
+        print(f"      run log: {log_path}")
         print()
 
     print("============== Summary ==============")
