@@ -107,3 +107,8 @@ then
   echo "Executing MRAM Benchmark"
   ./build-mram/mram > $OUTDIR/mram.csv
 fi
+
+echo "=== Benchmarks Finished ==="
+OUTPUT_ARCHIVE="$(basename $OUTDIR).tar"
+echo "Creating output archive '$OUTPUT_ARCHIVE"
+tar cf $OUTPUT_ARCHIVE $OUTDIR/*
