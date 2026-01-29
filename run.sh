@@ -11,7 +11,7 @@ RUN_BFSMLP="no"
 RUN_MRAM="no"
 
 # Output Directory of CSV Files
-OUTDIR=$(realpath output/)
+OUTDIR=output/
 
 function print_help_exit {
   echo "Usage: ./run.sh ([ all | prim | mlpbfs | fast | mram ])?"
@@ -58,9 +58,9 @@ else
 fi
 
 echo "=== Benchmark Configuration ==="
-echo "RUN_PRIM: $RUN_PRIM"
-echo "RUN_BFSMLP: $RUN_BFSMLP"
-echo "RUN_MRAM: $RUN_MRAM"
+echo "RUN_PRIM: $RUN_PRIM (Claim C1)"
+echo "RUN_BFSMLP: $RUN_BFSMLP (Claim C2)"
+echo "RUN_MRAM: $RUN_MRAM (Claim C3)"
 
 echo "Writing outputs to: $OUTDIR"
 echo ""
@@ -111,4 +111,4 @@ fi
 echo "=== Benchmarks Finished ==="
 OUTPUT_ARCHIVE="$(basename $OUTDIR).tar"
 echo "Creating output archive '$OUTPUT_ARCHIVE"
-tar cf $OUTPUT_ARCHIVE $OUTDIR/*
+tar cf $OUTPUT_ARCHIVE $OUTDIR/
