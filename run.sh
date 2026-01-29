@@ -96,8 +96,8 @@ then
   
   if [ ! -d ./ime-client-library ];
   then
-    echo "Folder ime-client-library missing. Move it here to run the MRAM benchmark."
-    exit 1
+    echo "Folder ime-client-library missing. Trying to copy it from $(realpath ../)"
+    cp -r ../ime-client-library ./
   fi
 
   echo "Compiling MRAM Benchmark"
@@ -112,3 +112,4 @@ echo "=== Benchmarks Finished ==="
 OUTPUT_ARCHIVE="$(basename $OUTDIR).tar"
 echo "Creating output archive '$OUTPUT_ARCHIVE"
 tar cf $OUTPUT_ARCHIVE $OUTDIR/
+cp $OUTPUT_ARCHIVE ~/
