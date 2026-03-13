@@ -1,5 +1,5 @@
 DPU_DIR := dpu
-HOST_DIR := host
+HOST_DIR := ./
 BUILDDIR ?= bin
 NR_TASKLETS ?= 16
 NR_DPUS ?= 64
