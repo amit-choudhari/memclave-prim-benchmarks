@@ -10,6 +10,9 @@ RUN_BFSMLP="no"
 # Benchmark evaluating MRAM throughput
 RUN_MRAM="no"
 
+# Microbenchmark reporting subkernel load times
+RUN_SUBK="no"
+
 # Output Directory of CSV Files
 OUTDIR=output/
 
@@ -22,6 +25,7 @@ function print_help_exit {
   echo "prim   - Run the full PrIM benchmark suite with default input sizes"
   echo "bfsmlp - Run the MLP and BFS benchmarks with different input sizes"
   echo "mram   - Run the MRAM benchmark"
+  echo "subk   - Run the benchmark reporting subkernel load speeds"
   exit 1
 }
 
@@ -37,6 +41,7 @@ then
     RUN_PRIM="yes"
     RUN_BFSMLP="yes"
     RUN_MRAM="yes"
+    RUN_SUBK="yes"
   elif [ "$1" == "fast" ];
   then
     RUN_PRIM="yes"
@@ -50,6 +55,9 @@ then
   elif [ "$1" == "mram" ];
   then
     RUN_MRAM="yes"
+  elif [ "$1" == "subk" ];
+  then
+    RUN_SUBK="yes"
   else
     print_help_exit
   fi
@@ -61,6 +69,7 @@ echo "=== Benchmark Configuration ==="
 echo "RUN_PRIM: $RUN_PRIM (Claim C1)"
 echo "RUN_BFSMLP: $RUN_BFSMLP (Claim C2)"
 echo "RUN_MRAM: $RUN_MRAM (Claim C3)"
+echo "RUN_SUBK: $RUN_SUBK (Claim C3)"
 
 echo "Writing outputs to: $OUTDIR"
 echo ""
@@ -106,10 +115,21 @@ then
 
   echo "Executing MRAM Benchmark"
   ./build-mram/mram > $OUTDIR/mram.csv
+
+fi
+
+if [ "$RUN_SUBK" == "yes" ];
+then
+  mkdir -p sk-load-bench/bin/
+  scp -P 26173 memclave@localhost:~/ime-client-library/sk-load-bench sk-load-bench/bin/
+  echo "=== Running Subkernel loading baseline Benchmark ==="
+  cd sk-load-bench
+  make
+  ./bin/host_code > ../$OUTDIR/sk_baseline.csv
+  cd ..
 fi
 
 echo "=== Benchmarks Finished ==="
 OUTPUT_ARCHIVE="$(basename $OUTDIR).tar"
 echo "Creating output archive '$OUTPUT_ARCHIVE"
 tar cf $OUTPUT_ARCHIVE $OUTDIR/
-cp $OUTPUT_ARCHIVE ~/
